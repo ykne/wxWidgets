@@ -195,6 +195,13 @@ protected:
         CreatePopupMenu(), not destroyed when the user dismisses it, allowing
         to reuse the same menu pointer multiple times.
 
+        @note When using AppIndicator-based implementation in wxGTK, this
+            method (or CreatePopupMenu() if it's not overridden) is also called
+            whenever the icon is shown or updated, not just when the user
+            requests the popup menu. Overriding GetPopupMenu() rather than
+            CreatePopupMenu() is especially recommended when using this
+            backend, to avoid recreating the menu on every icon update.
+
         @since 3.1.5
     */
     virtual wxMenu* GetPopupMenu();
