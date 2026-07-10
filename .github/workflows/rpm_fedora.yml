@@ -1,0 +1,88 @@
+name: Build wxGTK RPM (Fedora)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - appindicator-sni-taskbar-3.2-rpm-ci
+    paths:
+      - packaging/fedora/**
+      - .github/workflows/rpm_fedora.yml
+
+jobs:
+  rpm:
+    runs-on: ubuntu-latest
+    # "fedora:latest" always resolves to the current Fedora GA release, so
+    # %dist in the resulting RPMs tracks whatever is current when the job runs.
+    container: fedora:latest
+    steps:
+      # actions/checkout with submodules needs a real git binary already
+      # present in the container before it runs.
+      - name: Install git
+        run: dnf install -y git
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install RPM build tooling
+        run: dnf install -y rpm-build rpmdevtools 'dnf-command(builddep)' bzip2 tar
+
+      - name: Determine wxWidgets version from source
+        id: wxver
+        run: |
+          set -euo pipefail
+          major=$(grep -oP '(?<=#define wxMAJOR_VERSION)\s+\K\d+' include/wx/version.h)
+          minor=$(grep -oP '(?<=#define wxMINOR_VERSION)\s+\K\d+' include/wx/version.h)
+          release=$(grep -oP '(?<=#define wxRELEASE_NUMBER)\s+\K\d+' include/wx/version.h)
+          echo "version=$major.$minor.$release" >> "$GITHUB_OUTPUT"
+
+      # The spec's Source0 must be a full checkout including submodule
+      # content: configure.in prefers system libs when found, but nanosvg/
+      # pcre/catch/expat/jpeg have no "sys" fallback path exercised here, and
+      # `git archive` alone never includes submodule blobs regardless of
+      # whether they're checked out locally.
+      - name: Build source tarball (superproject + submodules)
+        env:
+          WX_VERSION: ${{ steps.wxver.outputs.version }}
+        run: |
+          set -euo pipefail
+          prefix="wxWidgets-${WX_VERSION}/"
+          tar_path="${GITHUB_WORKSPACE}/wxWidgets-${WX_VERSION}.tar"
+
+          git archive --format=tar --prefix="$prefix" -o "$tar_path" HEAD
+
+          git submodule --quiet foreach --recursive \
+            'git archive --format=tar --prefix="'"$prefix"'$sm_path/" HEAD > "'"$GITHUB_WORKSPACE"'/sub.tar" && \
+             tar --concatenate --file="'"$tar_path"'" "'"$GITHUB_WORKSPACE"'/sub.tar" && \
+             rm "'"$GITHUB_WORKSPACE"'/sub.tar"'
+
+          bzip2 "$tar_path"
+
+      - name: Populate rpmbuild tree
+        env:
+          WX_VERSION: ${{ steps.wxver.outputs.version }}
+        run: |
+          set -euo pipefail
+          rpmdev-setuptree
+          cp packaging/fedora/wxGTK.spec ~/rpmbuild/SPECS/wxGTK.spec
+          cp packaging/fedora/wx-config ~/rpmbuild/SOURCES/wx-config
+          cp packaging/fedora/*.patch ~/rpmbuild/SOURCES/
+          mv "wxWidgets-${WX_VERSION}.tar.bz2" ~/rpmbuild/SOURCES/
+
+          # The committed spec's Version: is a snapshot from whenever it was
+          # last hand-edited; always resync it to the actual checked-out
+          # source so a forgotten manual bump can't silently produce an RPM
+          # whose Source0 doesn't match its own Version tag.
+          sed -i "s/^Version:.*/Version: ${WX_VERSION}/" ~/rpmbuild/SPECS/wxGTK.spec
+
+      - name: Install build dependencies
+        run: dnf builddep -y ~/rpmbuild/SPECS/wxGTK.spec
+
+      - name: Build RPMs
+        run: rpmbuild -bb --without tests ~/rpmbuild/SPECS/wxGTK.spec
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wxGTK-rpms
+          path: ~/rpmbuild/RPMS/**/*.rpm
