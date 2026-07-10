@@ -21,6 +21,13 @@ jobs:
       - name: Install git
         run: dnf install -y git
 
+      # actions/checkout marks the workspace safe only within its own
+      # temporary git config; our later steps run plain `git` commands as
+      # the container's own user, which doesn't match the checked-out
+      # files' owning UID and trips git's dubious-ownership check.
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
