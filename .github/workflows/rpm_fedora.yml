@@ -87,9 +87,11 @@ jobs:
         run: dnf builddep -y ~/rpmbuild/SPECS/wxGTK.spec
 
       - name: Build RPMs
-        run: rpmbuild -bb --without tests ~/rpmbuild/SPECS/wxGTK.spec
+        run: rpmbuild -ba --without tests ~/rpmbuild/SPECS/wxGTK.spec
 
       - uses: actions/upload-artifact@v4
         with:
           name: wxGTK-rpms
-          path: ~/rpmbuild/RPMS/**/*.rpm
+          path: |
+            ~/rpmbuild/RPMS/**/*.rpm
+            ~/rpmbuild/SRPMS/*.src.rpm
