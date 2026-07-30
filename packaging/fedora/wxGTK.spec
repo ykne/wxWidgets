@@ -7,7 +7,7 @@
 
 Name:           wxGTK
 Version:        3.2.12
-Release:        1.sni%{?dist}
+Release:        2.sni%{?dist}
 Summary:        GTK port of the wxWidgets GUI library
 License:        LGPL-2.0-or-later WITH WxWindows-exception-3.1
 URL:            https://www.wxwidgets.org/
@@ -74,6 +74,14 @@ Provides:       %{srcname} = %{version}-%{release}
 Provides:       bundled(scintilla) = 3.7.2
 Requires:       %{wxbasename}%{?_isa} = %{version}-%{release}
 Requires:       %{name}-i18n = %{version}-%{release}
+# AppIndicator::activate (primary-click handling) only exists in
+# libayatana-appindicator 0.6.0+; against older versions g_signal_connect()
+# silently fails to connect (a warning, not a crash) and tray icons just
+# keep the pre-existing menu-only click behavior with no double-click
+# restore, so this needs to be a hard version floor, not just a BuildRequires.
+%if %{with appindicator}
+Requires:       libayatana-appindicator-gtk3 >= 0.6.0
+%endif
 
 %description
 wxWidgets is the GTK port of the C++ cross-platform wxWidgets
@@ -364,6 +372,13 @@ fi
 %doc html
 
 %changelog
+* Wed Jul 29 2026 ykne <6250736+ykne@users.noreply.github.com> - 3.2.12-2.sni
+- Require libayatana-appindicator-gtk3 >= 0.6.0 when built with appindicator
+  support: taskbar.cpp now connects to AppIndicator::activate (added in
+  0.6.0) to restore tray-icon double-click behavior; against older
+  versions the connection silently fails (no crash, just stays dead) so
+  this needs to be a real version floor, not just a BuildRequires
+
 * Thu Jul 09 2026 ykne <6250736+ykne@users.noreply.github.com> - 3.2.12-1.sni
 - Update to 3.2.12 snapshot (appindicator-sni-taskbar-3.2 branch HEAD)
 - Build locale/*.mo catalogs via 'make -C locale allmo' before install; the
