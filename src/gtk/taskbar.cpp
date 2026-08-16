@@ -348,8 +348,15 @@ void wxTaskBarIcon::Private::SetIcon()
             APP_INDICATOR_CATEGORY_APPLICATION_STATUS
         );
 
-        g_signal_connect(m_appIndicator, "activate",
-            G_CALLBACK(appindicator_activate), m_taskBarIcon);
+        // The "activate" signal was only added in libayatana-appindicator
+        // 0.6.0 (absent in 0.5.94 and earlier); connecting to a signal that
+        // doesn't exist on the actual runtime library triggers a loud GLib
+        // critical warning, so check for its existence first.
+        if ( g_signal_lookup("activate", G_TYPE_FROM_INSTANCE(m_appIndicator.get())) != 0 )
+        {
+            g_signal_connect(m_appIndicator, "activate",
+                G_CALLBACK(appindicator_activate), m_taskBarIcon);
+        }
 
         app_indicator_set_icon_theme_path(m_appIndicator, fnIcon.GetPath().utf8_str());
     }
