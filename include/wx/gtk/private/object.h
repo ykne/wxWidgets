@@ -22,6 +22,14 @@ public:
     explicit wxGtkObject(T *p) : m_ptr(p) { }
     ~wxGtkObject() { if ( m_ptr ) g_object_unref(m_ptr); }
 
+    wxGtkObject& operator=(T *p)
+    {
+        if ( m_ptr )
+            g_object_unref(m_ptr);
+        m_ptr = p;
+        return *this;
+    }
+
     T* get() const { return m_ptr; }
     operator T *() const { return m_ptr; }
 
