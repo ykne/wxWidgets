@@ -176,6 +176,19 @@ icon_activate(void*, wxTaskBarIcon* taskBarIcon)
     }
 }
 
+#if wxUSE_APPINDICATOR
+static void
+appindicator_activate(AppIndicator*, gint, gint, wxTaskBarIcon* taskBarIcon)
+{
+    // AppIndicator's "activate" signal only fires for a genuine double-click
+    // (the SNI host itself decides single-click/right-click go to the menu
+    // instead), so map it straight to LEFT_DCLICK rather than trying
+    // LEFT_DOWN first the way icon_activate() does for a real single click.
+    wxTaskBarIconEvent event(wxEVT_TASKBAR_LEFT_DCLICK, taskBarIcon);
+    taskBarIcon->SafelyProcessEvent(event);
+}
+#endif // wxUSE_APPINDICATOR
+
 static gboolean
 icon_popup_menu(GtkWidget*, wxTaskBarIcon* taskBarIcon)
 {
@@ -334,6 +347,9 @@ void wxTaskBarIcon::Private::SetIcon()
             fnIcon.GetName().utf8_str(),
             APP_INDICATOR_CATEGORY_APPLICATION_STATUS
         );
+
+        g_signal_connect(m_appIndicator, "activate",
+            G_CALLBACK(appindicator_activate), m_taskBarIcon);
 
         app_indicator_set_icon_theme_path(m_appIndicator, fnIcon.GetPath().utf8_str());
     }
